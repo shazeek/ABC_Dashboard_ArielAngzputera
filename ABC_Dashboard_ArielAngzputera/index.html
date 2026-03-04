@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Inventory Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+        }
+
+        /* Navigation Bar */
+        .navbar {
+            background-color: #14532d; /* Dark Green */
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar h1 {
+            color: #ffffff;
+            font-size: 20px;
+            margin: 0;
+        }
+
+        .nav-links a {
+            color: #ffffff;
+            text-decoration: none;
+            margin-left: 20px;
+            font-weight: 500;
+        }
+
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .container h2 {
+            margin-top: 0;
+        }
+
+        /* Form */
+        .form-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            flex: 1;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .add-btn {
+            background-color: #2563eb;
+            color: white;
+        }
+
+        .add-btn:hover {
+            background-color: #1d4ed8;
+        }
+
+        .clear-btn {
+            background-color: #ef4444;
+            color: white;
+            margin-top: 10px;
+        }
+
+        .clear-btn:hover {
+            background-color: #dc2626;
+        }
+
+        /* List */
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .chart-container {
+            margin-top: 40px;
+        }
+
+        .error {
+            color: red;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="navbar">
+        <h1>Inventory Dashboard</h1>
+        <div class="nav-links">
+            <a href="index.html">Dashboard</a>
+            <a href="about.html">Developer Profile</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Add Inventory Item</h2>
+
+        <div class="form-group">
+            <input type="text" id="itemName" placeholder="Item Name">
+            <input type="number" id="quantity" placeholder="Quantity" min="0" step="1">
+            <button class="add-btn" onclick="addItem()">Add</button>
+        </div>
+
+        <div id="errorMessage" class="error"></div>
+
+        <h3>Inventory List</h3>
+        <ul id="inventoryList"></ul>
+
+        <button class="clear-btn" onclick="clearAll()">Clear All</button>
+
+        <div class="chart-container">
+            <canvas id="inventoryChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let inventory = [];
+        let chart;
+
+        function loadInventory() {
+            const stored = localStorage.getItem("inventory");
+            if (stored) {
+                inventory = JSON.parse(stored);
+            }
+            renderList();
+            updateChart();
+        }
+
+        function saveInventory() {
+            localStorage.setItem("inventory", JSON.stringify(inventory));
+        }
+
+        function addItem() {
+            const nameInput = document.getElementById("itemName");
+            const quantityInput = document.getElementById("quantity");
+            const errorMessage = document.getElementById("errorMessage");
+
+            const name = nameInput.value.trim();
+            const quantity = quantityInput.value;
+
+            errorMessage.textContent = "";
+
+            if (name === "") {
+                errorMessage.textContent = "Item name cannot be empty.";
+                return;
+            }
+
+            if (quantity === "" || isNaN(quantity)) {
+                errorMessage.textContent = "Quantity must be a valid number.";
+                return;
+            }
+
+            if (parseInt(quantity) < 0) {
+                errorMessage.textContent = "Quantity cannot be negative.";
+                return;
+            }
+
+            const duplicate = inventory.find(item => item.name.toLowerCase() === name.toLowerCase());
+            if (duplicate) {
+                errorMessage.textContent = "Item already exists.";
+                return;
+            }
+
+            inventory.push({
+                name: name,
+                quantity: parseInt(quantity)
+            });
+
+            saveInventory();
+            renderList();
+            updateChart();
+
+            nameInput.value = "";
+            quantityInput.value = "";
+        }
+
+        function renderList() {
+            const list = document.getElementById("inventoryList");
+            list.innerHTML = "";
+
+            inventory.forEach(item => {
+                const li = document.createElement("li");
+                li.innerHTML = `<span>${item.name}</span><span>${item.quantity}</span>`;
+                list.appendChild(li);
+            });
+        }
+
+        function clearAll() {
+            if (confirm("Are you sure you want to clear all items?")) {
+                localStorage.removeItem("inventory");
+                inventory = [];
+                renderList();
+                updateChart();
+            }
+        }
+
+        function createChart() {
+            const ctx = document.getElementById("inventoryChart").getContext("2d");
+
+            chart = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: "Quantity",
+                        data: [],
+                        backgroundColor: []
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart() {
+            if (!chart) return;
+
+            const labels = inventory.map(item => item.name);
+            const data = inventory.map(item => item.quantity);
+            const colors = inventory.map(item =>
+                item.quantity < 10 ? "#ef4444" : "#2563eb"
+            );
+
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = data;
+            chart.data.datasets[0].backgroundColor = colors;
+            chart.update();
+        }
+
+        // Prevent letters in quantity field
+        document.getElementById("quantity").addEventListener("input", function () {
+            this.value = this.value.replace(/[^0-9]/g, "");
+        });
+
+        window.onload = function() {
+            createChart();
+            loadInventory();
+        };
+    </script>
+
+</body>
+</html>
